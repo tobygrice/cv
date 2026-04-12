@@ -1,0 +1,49 @@
+# .github/workflows/publish-resume.yml
+name: Build and publish resume
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Compile LaTeX
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: main.tex
+
+      - name: Rename PDF
+        run: mv main.pdf Tobias_Grice_CV.pdf
+
+      - name: Ensure rolling release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || \
+          gh release create latest \
+            --title "Current CV" \
+            --notes "Automatically updated latest PDF."
+
+      - name: Update release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit latest \
+            --title "Current CV" \
+            --notes "Automatically updated from commit ${GITHUB_SHA}" \
+            --latest
+
+      - name: Upload PDF to rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload latest Tobias_Grice_CV.pdf --clobber
