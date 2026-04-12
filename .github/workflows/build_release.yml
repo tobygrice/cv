@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Compile LaTeX
         uses: xu-cheng/latex-action@v3
@@ -24,26 +26,24 @@ jobs:
       - name: Rename PDF
         run: mv main.pdf Tobias_Grice_CV.pdf
 
-      - name: Ensure rolling release exists
+      - name: Delete existing rolling release if present
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view latest >/dev/null 2>&1 || \
-          gh release create latest \
-            --title "Tobias Grice CV" \
-            --notes "Automatically updated latest PDF."
+          gh release view latest >/dev/null 2>&1 && gh release delete latest --yes || true
 
-      - name: Update release metadata
+      - name: Delete existing rolling tag if present
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release edit latest \
+          git push origin :refs/tags/latest || true
+
+      - name: Create fresh rolling release at current commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create latest Tobias_Grice_CV.pdf \
+            --target "${GITHUB_SHA}" \
             --title "Tobias Grice CV" \
             --notes "Automatically updated from commit ${GITHUB_SHA}" \
             --latest
-
-      - name: Upload PDF to rolling release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload latest Tobias_Grice_CV.pdf --clobber
