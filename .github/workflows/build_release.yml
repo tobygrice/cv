@@ -1,26 +1,18 @@
+Adapt the workflow from my current workflow:
+
 # .github/workflows/publish-resume.yml
 name: Build and publish resume
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  contents: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-
-    environment:
-      name: github-pages
 
     steps:
       - name: Check out repo
@@ -31,28 +23,29 @@ jobs:
         with:
           root_file: main.tex
 
-      - name: Prepare Pages files
+      - name: Rename PDF
+        run: mv main.pdf Tobias_Grice_CV.pdf
+
+      - name: Ensure rolling release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir public
-          mv main.pdf public/Tobias_Grice_CV.pdf
-          cat > public/index.html <<'EOF'
-          <!doctype html>
-          <html>
-            <head>
-              <meta charset="utf-8">
-              <meta http-equiv="refresh" content="0; url=./Tobias_Grice_CV.pdf">
-              <title>Tobias Grice CV</title>
-            </head>
-            <body>
-              <p><a href="./Tobias_Grice_CV.pdf">Open CV</a></p>
-            </body>
-          </html>
-          EOF
+          gh release view latest >/dev/null 2>&1 || \
+          gh release create latest \
+            --title "Tobias Grice CV" \
+            --notes "Automatically updated latest PDF."
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: public
+      - name: Update release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit latest \
+            --title "Tobias Grice CV" \
+            --notes "Automatically updated from commit ${GITHUB_SHA}" \
+            --latest
 
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+      - name: Upload PDF to rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload latest Tobias_Grice_CV.pdf --clobber
